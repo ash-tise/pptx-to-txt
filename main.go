@@ -13,6 +13,7 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
+// Helper function to read a file from within the zip archive
 func readFileFromZip(zipReader *zip.ReadCloser, filename string) ([]byte, error) {
 	for _, file := range zipReader.File {
 		if file.Name == filename {
@@ -57,6 +58,8 @@ func extractTextFromSlide(slideData []byte) (string, error) {
 		case xml.EndElement:
 			if element.Name.Local == "t" {
 				inTextElement = false
+				// Add a space after each text block
+				slideText.WriteString(" ")
 			}
 		case xml.CharData:
 			if inTextElement {
@@ -65,6 +68,7 @@ func extractTextFromSlide(slideData []byte) (string, error) {
 		}
 	}
 
+	// Use strings.Fields to remove extra spaces
 	trimmedText := strings.Join(strings.Fields(slideText.String()), " ")
 	return trimmedText, nil
 }
@@ -77,6 +81,7 @@ func main() {
 	pptPath := os.Args[1]
 	outputFileName := strings.TrimSuffix(pptPath, ".pptx") + "_output.txt"
 
+	// Open the PowerPoint file as a zip archive
 	zipReader, err := zip.OpenReader(pptPath)
 	if err != nil {
 		log.Fatalf("Error opening PowerPoint file: %v", err)
@@ -85,10 +90,12 @@ func main() {
 
 	var fullText strings.Builder
 
+	// Loop over all slides
 	for i := 1; ; i++ {
 		slideName := fmt.Sprintf("ppt/slides/slide%d.xml", i)
 		slideData, err := readFileFromZip(zipReader, slideName)
 		if err != nil {
+			// If the file is not found, assume we've processed all slides
 			if strings.Contains(err.Error(), "not found") {
 				break
 			}
@@ -101,11 +108,11 @@ func main() {
 		}
 
 		fullText.WriteString(slideText)
-		if i < len(zipReader.File) {
-			fullText.WriteString("\n\n")
-		}
+		// Add two newlines between slides
+		fullText.WriteString("\n\n")
 	}
 
+	// Write the extracted text to a file
 	err = os.WriteFile(outputFileName, []byte(fullText.String()), 0644)
 	if err != nil {
 		log.Fatalf("Error writing to output file: %v", err)
