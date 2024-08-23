@@ -8,6 +8,9 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/user"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"golang.org/x/net/html/charset"
@@ -73,13 +76,43 @@ func extractTextFromSlide(slideData []byte) (string, error) {
 	return trimmedText, nil
 }
 
+func getDesktopPath() (string, error) {
+	usr, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+
+	// Cross-platform desktop path determination
+	desktopPath := ""
+
+	switch os := runtime.GOOS; os {
+	case "windows":
+		desktopPath = filepath.Join(usr.HomeDir, "Desktop")
+	case "darwin":
+		desktopPath = filepath.Join(usr.HomeDir, "Desktop")
+	case "linux":
+		desktopPath = filepath.Join(usr.HomeDir, "Desktop")
+	default:
+		return "", fmt.Errorf("unsupported platform")
+	}
+
+	return desktopPath, nil
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		log.Fatalf("Usage: %s <input.pptx>", os.Args[0])
 	}
 
 	pptPath := os.Args[1]
-	outputFileName := strings.TrimSuffix(pptPath, ".pptx") + "_output.txt"
+	outputFileName := strings.TrimSuffix(filepath.Base(pptPath), ".pptx") + "_output.txt"
+
+	desktopPath, err := getDesktopPath()
+	if err != nil {
+		log.Fatalf("Error determining desktop path: %v", err)
+	}
+
+	outputFilePath := filepath.Join(desktopPath, outputFileName)
 
 	// Open the PowerPoint file as a zip archive
 	zipReader, err := zip.OpenReader(pptPath)
@@ -112,11 +145,11 @@ func main() {
 		fullText.WriteString("\n\n")
 	}
 
-	// Write the extracted text to a file
-	err = os.WriteFile(outputFileName, []byte(fullText.String()), 0644)
+	// Write the extracted text to a file on the desktop
+	err = os.WriteFile(outputFilePath, []byte(fullText.String()), 0644)
 	if err != nil {
 		log.Fatalf("Error writing to output file: %v", err)
 	}
 
-	fmt.Printf("Text extracted and written to %s\n", outputFileName)
+	fmt.Printf("Text extracted and written to %s\n", outputFilePath)
 }
